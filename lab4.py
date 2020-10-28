@@ -13,7 +13,7 @@ from tensorflow.keras.layers import Input, Dense, Reshape, Flatten
 from tensorflow.keras.layers import BatchNormalization, LeakyReLU
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose, UpSampling2D
 from tensorflow.keras.optimizers import Adam
-from scipy.misc import imsave
+from PIL import Image
 import random
 
 random.seed(1618)
@@ -50,7 +50,7 @@ NOISE_SIZE = 100  # length of noise array
 
 # file prefixes and directory
 OUTPUT_NAME = DATASET + "_" + LABEL
-OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
+OUTPUT_DIR = "~/outputs/" + OUTPUT_NAME
 
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
@@ -100,6 +100,16 @@ def buildDiscriminator():
 
     # TODO: build a discriminator which takes in a (28 x 28 x 1) image - possibly from mnist_f
     #       and possibly from the generator - and outputs a single digit REAL (1) or FAKE (0)
+    model.add(Conv2D(24, (2, 2)))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Conv2D(12, (2, 2)))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Flatten())
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Dense(128))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Dense(1, activation='sigmoid'))
 
     # Creating a Keras Model out of the network
     inputTensor = Input(shape=IMAGE_SHAPE)
@@ -112,6 +122,17 @@ def buildGenerator():
 
     # TODO: build a generator which takes in a (NOISE_SIZE) noise array and outputs a fake
     #       mnist_f (28 x 28 x 1) image
+    model.add(Dense(169))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Reshape((13, 13, 1)))
+    model.add(Conv2DTranspose(16, (2, 2)))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Conv2DTranspose(16, (2, 2), padding='same'))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv2DTranspose(1, (2, 2), padding='same'))
+
+    model.add(Dense(1, activation='sigmoid'))
 
     # Creating a Keras Model out of the network
     inputTensor = Input(shape=(NOISE_SIZE,))
@@ -168,7 +189,7 @@ def runGAN(generator, outfile):
     img = generator.predict(noise)[0]  # run generator on noise
     img = np.squeeze(img)  # readjust image shape if needed
     img = (0.5 * img + 0.5) * 255  # adjust values to range from 0 to 255 as needed
-    imsave(outfile, img)  # store resulting image
+    Image.fromarray(img, mode='L').save(outfile)
 
 
 ################################### RUNNING THE PIPELINE #############################
