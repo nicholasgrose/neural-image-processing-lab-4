@@ -15,6 +15,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose, UpSam
 from tensorflow.keras.optimizers import Adam
 from PIL import Image
 import random
+import matplotlib.pyplot as plt
 
 random.seed(1618)
 np.random.seed(1618)
@@ -46,15 +47,18 @@ elif DATASET == "cifar_10":
 
 IMAGE_SIZE = IH * IW * IZ
 
-NOISE_SIZE = 100  # length of noise array
+NOISE_SIZE = 256  # length of noise array
 
 # file prefixes and directory
 OUTPUT_NAME = DATASET + "_" + LABEL
-OUTPUT_DIR = "~/outputs/" + OUTPUT_NAME
+OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
+EPOCHS = 64
+GENERATOR_EPOCH_RATIO = 64
+LOG_INTERVAL = 8
 
 ################################### DATA FUNCTIONS ###################################
 
@@ -100,10 +104,10 @@ def buildDiscriminator():
 
     # TODO: build a discriminator which takes in a (28 x 28 x 1) image - possibly from mnist_f
     #       and possibly from the generator - and outputs a single digit REAL (1) or FAKE (0)
-    model.add(Conv2D(24, (2, 2)))
+    model.add(Conv2D(16, (2, 2)))
     model.add(LeakyReLU(alpha=0.2))
     model.add(MaxPooling2D((2, 2)))
-    model.add(Conv2D(12, (2, 2)))
+    model.add(Conv2D(8, (2, 2)))
     model.add(LeakyReLU(alpha=0.2))
     model.add(Flatten())
     model.add(LeakyReLU(alpha=0.2))
@@ -122,15 +126,20 @@ def buildGenerator():
 
     # TODO: build a generator which takes in a (NOISE_SIZE) noise array and outputs a fake
     #       mnist_f (28 x 28 x 1) image
-    model.add(Dense(169))
+    model.add(Dense(648))
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((13, 13, 1)))
+    model.add(Reshape((6, 6, 18)))
+
     model.add(Conv2DTranspose(16, (2, 2)))
     model.add(LeakyReLU(alpha=0.2))
     model.add(UpSampling2D(size=(2, 2)))
     model.add(Conv2DTranspose(16, (2, 2), padding='same'))
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Conv2DTranspose(1, (2, 2), padding='same'))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Conv2DTranspose(32, (2, 2)))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv2D(32, (2, 2)))
+    model.add(LeakyReLU(alpha=0.2))
 
     model.add(Dense(1, activation='sigmoid'))
 
@@ -140,13 +149,18 @@ def buildGenerator():
 
 
 def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
+    generator_losses = []
+    discriminator_losses = []
+
     # Setup
-    opt = Adam(lr=0.0002)
+    opt = Adam(lr=0.0001)
     loss = "binary_crossentropy"
+
+    opt_discriminator = Adam(lr=0.00002)
 
     # Setup adversary
     adversary = buildDiscriminator()
-    adversary.compile(loss=loss, optimizer=opt, metrics=["accuracy"])
+    adversary.compile(loss=loss, optimizer=opt_discriminator, metrics=["accuracy"])
 
     # Setup generator and GAN
     adversary.trainable = False  # freeze adversary's weights when training GAN
@@ -178,7 +192,18 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
             print("\t\tDiscriminator loss: %f." % advLoss[0])
             print("\t\tDiscriminator accuracy: %.2f%%." % (100 * advLoss[1]))
             print("\t\tGenerator loss: %f." % genLoss)
+            generator_losses.append(genLoss)
+            discriminator_losses.append(advLoss[0])
             runGAN(generator, OUTPUT_DIR + "/" + OUTPUT_NAME + "_test_%d.png" % (epoch / loggingInterval))
+
+    plot_x_axis = range(len(generator_losses))
+    generator_line, = plt.plot(plot_x_axis, generator_losses, color='blue', label='Generator Loss')
+    discriminator_line, = plt.plot(plot_x_axis, discriminator_losses, color='red', label='Discriminator Loss')
+    plt.title('Losses for Generator and Discriminator')
+    plt.xlabel('Log Number')
+    plt.ylabel('Loss')
+    plt.legend(handles=[generator_line, discriminator_line])
+    plt.savefig(f'{OUTPUT_DIR}/loss_plot.png')
 
     return (generator, adversary, gan)
 
@@ -204,7 +229,8 @@ def main():
     # Filter for just the class we are trying to generate
     data = preprocessData(raw)
     # Create and train all facets of the GAN
-    (generator, adv, gan) = buildGAN(data, epochs=60000, loggingInterval=1000)
+    (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=GENERATOR_EPOCH_RATIO * EPOCHS,
+                                     loggingInterval=LOG_INTERVAL)
     # Utilize our spooky neural net gimmicks to create realistic counterfeit images
     for i in range(10):
         runGAN(generator, OUTPUT_DIR + "/" + OUTPUT_NAME + "_final_%d.png" % i)
