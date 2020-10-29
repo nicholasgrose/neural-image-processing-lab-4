@@ -4,6 +4,10 @@
 # uses Fashion MNIST https://www.kaggle.com/zalando-research/fashionmnist
 # uses CIFAR-10 https://www.cs.toronto.edu/~kriz/cifar.html
 
+import matplotlib as mpl
+from tensorflow.python.keras.layers.core import Dropout
+mpl.use('Agg')
+
 import os
 import numpy as np
 import tensorflow as tf
@@ -16,6 +20,7 @@ from tensorflow.keras.optimizers import Adam
 from PIL import Image
 import random
 import matplotlib.pyplot as plt
+
 
 random.seed(1618)
 np.random.seed(1618)
@@ -38,7 +43,7 @@ elif DATASET == "mnist_f":
     IMAGE_SHAPE = (IH, IW, IZ) = (28, 28, 1)
     CLASSLIST = ["top", "trouser", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "ankle boot"]
     # TODO: choose a label to train on from the CLASSLIST above
-    LABEL = "coat"
+    LABEL = "sneaker"
 
 elif DATASET == "cifar_10":
     IMAGE_SHAPE = (IH, IW, IZ) = (32, 32, 3)
@@ -47,7 +52,7 @@ elif DATASET == "cifar_10":
 
 IMAGE_SIZE = IH * IW * IZ
 
-NOISE_SIZE = 256  # length of noise array
+NOISE_SIZE = 100  # length of noise array
 
 # file prefixes and directory
 OUTPUT_NAME = DATASET + "_" + LABEL
@@ -57,7 +62,7 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 VERBOSE_OUTPUT = False
 
 EPOCHS = 64
-GENERATOR_EPOCH_RATIO = 64
+GENERATOR_EPOCH_RATIO = 196
 LOG_INTERVAL = 8
 
 ################################### DATA FUNCTIONS ###################################
@@ -105,14 +110,17 @@ def buildDiscriminator():
     # TODO: build a discriminator which takes in a (28 x 28 x 1) image - possibly from mnist_f
     #       and possibly from the generator - and outputs a single digit REAL (1) or FAKE (0)
     model.add(Conv2D(16, (2, 2)))
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(LeakyReLU(alpha=0.3))
     model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.25))
     model.add(Conv2D(8, (2, 2)))
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(LeakyReLU(alpha=0.3))
+    model.add(Dropout(0.25))
     model.add(Flatten())
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(LeakyReLU(alpha=0.3))
     model.add(Dense(128))
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(LeakyReLU(alpha=0.3))
+    model.add(Dropout(0.25))
     model.add(Dense(1, activation='sigmoid'))
 
     # Creating a Keras Model out of the network
@@ -126,22 +134,18 @@ def buildGenerator():
 
     # TODO: build a generator which takes in a (NOISE_SIZE) noise array and outputs a fake
     #       mnist_f (28 x 28 x 1) image
-    model.add(Dense(648))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((6, 6, 18)))
+    model.add(Dense(7 * 7 * 16))
+    model.add(Reshape((7, 7, 16)))
 
-    model.add(Conv2DTranspose(16, (2, 2)))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(UpSampling2D(size=(2, 2)))
-    model.add(Conv2DTranspose(16, (2, 2), padding='same'))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(UpSampling2D(size=(2, 2)))
-    model.add(Conv2DTranspose(32, (2, 2)))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Conv2D(32, (2, 2)))
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(BatchNormalization())
+    model.add(Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same', activation='relu'))
+    # model.add(LeakyReLU(alpha=0.3))
+    model.add(BatchNormalization())
+    model.add(Conv2DTranspose(128, (3, 3), strides=(2, 2), padding='same', activation='relu'))
+    # model.add(LeakyReLU(alpha=0.3))
+    model.add(BatchNormalization())
 
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Conv2DTranspose(1, (2, 2), activation='sigmoid', padding='same'))
 
     # Creating a Keras Model out of the network
     inputTensor = Input(shape=(NOISE_SIZE,))
@@ -156,7 +160,7 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
     opt = Adam(lr=0.0001)
     loss = "binary_crossentropy"
 
-    opt_discriminator = Adam(lr=0.00002)
+    opt_discriminator = Adam(lr=0.00001)
 
     # Setup adversary
     adversary = buildDiscriminator()
