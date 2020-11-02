@@ -62,7 +62,8 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 VERBOSE_OUTPUT = False
 
 EPOCHS = 64
-GENERATOR_EPOCH_RATIO = 196
+GENERATOR_TRAINING_RATIO = 2
+GENERATOR_BATCH_SIZE = 128
 LOG_INTERVAL = 8
 
 ################################### DATA FUNCTIONS ###################################
@@ -134,18 +135,21 @@ def buildGenerator():
 
     # TODO: build a generator which takes in a (NOISE_SIZE) noise array and outputs a fake
     #       mnist_f (28 x 28 x 1) image
-    model.add(Dense(7 * 7 * 16))
-    model.add(Reshape((7, 7, 16)))
+    model.add(Dense(7 * 7 * 256, input_shape=(100,)))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.3))
 
-    model.add(BatchNormalization())
-    model.add(Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same', activation='relu'))
-    # model.add(LeakyReLU(alpha=0.3))
-    model.add(BatchNormalization())
-    model.add(Conv2DTranspose(128, (3, 3), strides=(2, 2), padding='same', activation='relu'))
-    # model.add(LeakyReLU(alpha=0.3))
-    model.add(BatchNormalization())
+    model.add(Reshape((7, 7, 256)))
 
-    model.add(Conv2DTranspose(1, (2, 2), activation='sigmoid', padding='same'))
+    model.add(Conv2DTranspose(128, (3, 3), strides=(1, 1), padding='same'))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.3))
+
+    model.add(Conv2DTranspose(64, (4, 4), strides=(2, 2), padding='same'))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.3))
+
+    model.add(Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', activation='tanh'))
 
     # Creating a Keras Model out of the network
     inputTensor = Input(shape=(NOISE_SIZE,))
@@ -218,6 +222,7 @@ def runGAN(generator, outfile):
     img = generator.predict(noise)[0]  # run generator on noise
     img = np.squeeze(img)  # readjust image shape if needed
     img = (0.5 * img + 0.5) * 255  # adjust values to range from 0 to 255 as needed
+    img = np.round(img).astype(np.ubyte)
     Image.fromarray(img, mode='L').save(outfile)
 
 
@@ -233,7 +238,11 @@ def main():
     # Filter for just the class we are trying to generate
     data = preprocessData(raw)
     # Create and train all facets of the GAN
-    (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=GENERATOR_EPOCH_RATIO * EPOCHS,
+    if GENERATOR_TRAINING_RATIO is not None:
+        (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=GENERATOR_TRAINING_RATIO * EPOCHS,
+                                     loggingInterval=LOG_INTERVAL)
+    else:
+        (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=GENERATOR_BATCH_SIZE,
                                      loggingInterval=LOG_INTERVAL)
     # Utilize our spooky neural net gimmicks to create realistic counterfeit images
     for i in range(10):
