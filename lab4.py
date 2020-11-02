@@ -21,6 +21,8 @@ from PIL import Image
 import random
 import matplotlib.pyplot as plt
 
+physical_devices = tf.config.list_physical_devices('GPU') 
+tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 random.seed(1618)
 np.random.seed(1618)
@@ -43,7 +45,7 @@ elif DATASET == "mnist_f":
     IMAGE_SHAPE = (IH, IW, IZ) = (28, 28, 1)
     CLASSLIST = ["top", "trouser", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "ankle boot"]
     # TODO: choose a label to train on from the CLASSLIST above
-    LABEL = "sneaker"
+    LABEL = "shirt"
 
 elif DATASET == "cifar_10":
     IMAGE_SHAPE = (IH, IW, IZ) = (32, 32, 3)
@@ -61,10 +63,10 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
-EPOCHS = 96
-GENERATOR_TRAINING_RATIO = 128
+EPOCHS = 260
+GENERATOR_TRAINING_RATIO = 4
 GENERATOR_BATCH_SIZE = 128
-LOG_INTERVAL = 8
+LOG_INTERVAL = 30
 
 ################################### DATA FUNCTIONS ###################################
 
@@ -113,21 +115,25 @@ def buildDiscriminator():
     model.add(Conv2D(64, (4, 4), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
+
     model.add(MaxPooling2D((2, 2)))
+    model.add(BatchNormalization())
     model.add(Dropout(0.25))
+
     model.add(Conv2D(128, (5, 5), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
-    model.add(Dropout(0.25))
+
     model.add(MaxPooling2D((2, 2)))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.25))
+
     model.add(Conv2D(256, (5, 5), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
-
     model.add(Flatten())
-    model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.3))
+    
     model.add(Dense(1024))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
@@ -145,21 +151,31 @@ def buildGenerator():
 
     # TODO: build a generator which takes in a (NOISE_SIZE) noise array and outputs a fake
     #       mnist_f (28 x 28 x 1) image
-    model.add(Dense(7 * 7 * 256, input_shape=(100,)))
+    model.add(Dense(7 * 7 * 256))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
     model.add(Reshape((7, 7, 256)))
 
-    model.add(Conv2DTranspose(256, (4, 4), strides=(1, 1), padding='same'))
+    model.add(Conv2DTranspose(256, (3, 3), strides=(1, 1), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
-    model.add(Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same'))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(BatchNormalization())
+
+    model.add(Conv2DTranspose(128, (4, 4), strides=(1, 1), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
-    model.add(Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', activation='tanh'))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(BatchNormalization())
+
+    model.add(Conv2DTranspose(64, (4, 4), strides=(1, 1), padding='same'))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.3))
+
+    model.add(Conv2DTranspose(1, (5, 5), strides=(1, 1), padding='same', activation='tanh'))
 
     # Creating a Keras Model out of the network
     inputTensor = Input(shape=(NOISE_SIZE,))
