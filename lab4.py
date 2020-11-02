@@ -63,10 +63,10 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
-EPOCHS = 512
-GENERATOR_TRAINING_RATIO = 2
+EPOCHS = 1024
+GENERATOR_TRAINING_RATIO = 1
 GENERATOR_BATCH_SIZE = 128
-LOG_INTERVAL = 64
+LOG_INTERVAL = 128
 
 ################################### DATA FUNCTIONS ###################################
 
@@ -194,7 +194,7 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
 
     # Setup adversary
     adversary = buildDiscriminator()
-    adversary.compile(loss=loss, optimizer=opt_discriminator, metrics=["accuracy"])
+    adversary.compile(loss=loss, optimizer=opt, metrics=["accuracy"])
 
     # Setup generator and GAN
     adversary.trainable = False  # freeze adversary's weights when training GAN
@@ -265,7 +265,7 @@ def main():
     data = preprocessData(raw)
     # Create and train all facets of the GAN
     if GENERATOR_TRAINING_RATIO is not None:
-        (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=GENERATOR_TRAINING_RATIO * EPOCHS,
+        (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=int(GENERATOR_TRAINING_RATIO * EPOCHS),
                                      loggingInterval=LOG_INTERVAL)
     else:
         (generator, adv, gan) = buildGAN(data, epochs=EPOCHS, batchSize=GENERATOR_BATCH_SIZE,
