@@ -43,7 +43,7 @@ elif DATASET == "mnist_f":
     IMAGE_SHAPE = (IH, IW, IZ) = (28, 28, 1)
     CLASSLIST = ["top", "trouser", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "ankle boot"]
     # TODO: choose a label to train on from the CLASSLIST above
-    LABEL = "sneaker"
+    LABEL = "dress"
 
 elif DATASET == "cifar_10":
     IMAGE_SHAPE = (IH, IW, IZ) = (32, 32, 3)
@@ -61,10 +61,10 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
-EPOCHS = 96
-GENERATOR_TRAINING_RATIO = 128
+EPOCHS = 512
+GENERATOR_TRAINING_RATIO = 2
 GENERATOR_BATCH_SIZE = 128
-LOG_INTERVAL = 8
+LOG_INTERVAL = 64
 
 ################################### DATA FUNCTIONS ###################################
 
@@ -113,25 +113,29 @@ def buildDiscriminator():
     model.add(Conv2D(64, (4, 4), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
+
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.25))
+
     model.add(Conv2D(128, (5, 5), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
-    model.add(Dropout(0.25))
+
     model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.25))
+
     model.add(Conv2D(256, (5, 5), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
 
     model.add(Flatten())
-    model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.3))
+
     model.add(Dense(1024))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
+
     model.add(Dense(1, activation='sigmoid'))
 
     # Creating a Keras Model out of the network
@@ -145,21 +149,31 @@ def buildGenerator():
 
     # TODO: build a generator which takes in a (NOISE_SIZE) noise array and outputs a fake
     #       mnist_f (28 x 28 x 1) image
-    model.add(Dense(7 * 7 * 256, input_shape=(100,)))
+    model.add(Dense(7 * 7 * 256))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
     model.add(Reshape((7, 7, 256)))
 
-    model.add(Conv2DTranspose(256, (4, 4), strides=(1, 1), padding='same'))
+    model.add(Conv2DTranspose(256, (3, 3), strides=(1, 1), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
-    model.add(Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same'))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(BatchNormalization())
+
+    model.add(Conv2DTranspose(128, (4, 4), strides=(1, 1), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
-    model.add(Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', activation='tanh'))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(BatchNormalization())
+
+    model.add(Conv2DTranspose(64, (4, 4), strides=(1, 1), padding='same'))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.3))
+
+    model.add(Conv2DTranspose(1, (5, 5), strides=(1, 1), padding='same', activation='tanh'))
 
     # Creating a Keras Model out of the network
     inputTensor = Input(shape=(NOISE_SIZE,))
@@ -169,14 +183,16 @@ def buildGenerator():
 def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
     generator_losses = []
     discriminator_losses = []
+    x_vals = []
 
     # Setup
     opt = Adam(lr=0.0001)
+    opt_discriminator = Adam(lr=0.00005)
     loss = "binary_crossentropy"
 
     # Setup adversary
     adversary = buildDiscriminator()
-    adversary.compile(loss=loss, optimizer=opt, metrics=["accuracy"])
+    adversary.compile(loss=loss, optimizer=opt_discriminator, metrics=["accuracy"])
 
     # Setup generator and GAN
     adversary.trainable = False  # freeze adversary's weights when training GAN
@@ -210,11 +226,11 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
             print("\t\tGenerator loss: %f." % genLoss)
             generator_losses.append(genLoss)
             discriminator_losses.append(advLoss[0])
+            x_vals.append(epoch)
             runGAN(generator, OUTPUT_DIR + "/" + OUTPUT_NAME + "_test_%d.png" % (epoch / loggingInterval))
 
-    plot_x_axis = range(len(generator_losses))
-    generator_line, = plt.plot(plot_x_axis, generator_losses, color='blue', label='Generator Loss')
-    discriminator_line, = plt.plot(plot_x_axis, discriminator_losses, color='red', label='Discriminator Loss')
+    generator_line, = plt.plot(x_vals, generator_losses, color='blue', label='Generator Loss')
+    discriminator_line, = plt.plot(x_vals, discriminator_losses, color='red', label='Discriminator Loss')
     plt.title('Losses for Generator and Discriminator')
     plt.xlabel('Log Number')
     plt.ylabel('Loss')
