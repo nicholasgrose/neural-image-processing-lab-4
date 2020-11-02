@@ -194,7 +194,7 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
 
     # Setup adversary
     adversary = buildDiscriminator()
-    adversary.compile(loss=loss, optimizer=opt, metrics=["accuracy"])
+    adversary.compile(loss=loss, optimizer=opt_discriminator, metrics=["accuracy"])
 
     # Setup generator and GAN
     adversary.trainable = False  # freeze adversary's weights when training GAN
