@@ -61,8 +61,8 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
-EPOCHS = 64
-GENERATOR_TRAINING_RATIO = 2
+EPOCHS = 96
+GENERATOR_TRAINING_RATIO = 128
 GENERATOR_BATCH_SIZE = 128
 LOG_INTERVAL = 8
 
@@ -110,16 +110,26 @@ def buildDiscriminator():
 
     # TODO: build a discriminator which takes in a (28 x 28 x 1) image - possibly from mnist_f
     #       and possibly from the generator - and outputs a single digit REAL (1) or FAKE (0)
-    model.add(Conv2D(16, (2, 2)))
+    model.add(Conv2D(64, (4, 4), padding='same'))
+    model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.25))
-    model.add(Conv2D(8, (2, 2)))
+    model.add(Conv2D(128, (5, 5), padding='same'))
+    model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
-    model.add(Flatten())
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Conv2D(256, (5, 5), padding='same'))
+    model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
-    model.add(Dense(128))
+    model.add(Dropout(0.25))
+
+    model.add(Flatten())
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.3))
+    model.add(Dense(1024))
+    model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
     model.add(Dense(1, activation='sigmoid'))
@@ -141,11 +151,11 @@ def buildGenerator():
 
     model.add(Reshape((7, 7, 256)))
 
-    model.add(Conv2DTranspose(128, (3, 3), strides=(1, 1), padding='same'))
+    model.add(Conv2DTranspose(256, (4, 4), strides=(1, 1), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
-    model.add(Conv2DTranspose(64, (4, 4), strides=(2, 2), padding='same'))
+    model.add(Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
 
@@ -164,11 +174,9 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
     opt = Adam(lr=0.0001)
     loss = "binary_crossentropy"
 
-    opt_discriminator = Adam(lr=0.00001)
-
     # Setup adversary
     adversary = buildDiscriminator()
-    adversary.compile(loss=loss, optimizer=opt_discriminator, metrics=["accuracy"])
+    adversary.compile(loss=loss, optimizer=opt, metrics=["accuracy"])
 
     # Setup generator and GAN
     adversary.trainable = False  # freeze adversary's weights when training GAN
