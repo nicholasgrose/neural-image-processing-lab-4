@@ -63,10 +63,10 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
-EPOCHS = 260
-GENERATOR_TRAINING_RATIO = 4
+EPOCHS = 512
+GENERATOR_TRAINING_RATIO = 2
 GENERATOR_BATCH_SIZE = 128
-LOG_INTERVAL = 30
+LOG_INTERVAL = 64
 
 ################################### DATA FUNCTIONS ###################################
 
@@ -125,19 +125,19 @@ def buildDiscriminator():
     model.add(LeakyReLU(alpha=0.3))
 
     model.add(MaxPooling2D((2, 2)))
-    model.add(BatchNormalization())
     model.add(Dropout(0.25))
 
     model.add(Conv2D(256, (5, 5), padding='same'))
     model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
+
     model.add(Flatten())
-    
+
     model.add(Dense(1024))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.3))
     model.add(Dropout(0.25))
+
     model.add(Dense(1, activation='sigmoid'))
 
     # Creating a Keras Model out of the network
@@ -185,14 +185,16 @@ def buildGenerator():
 def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
     generator_losses = []
     discriminator_losses = []
+    x_vals = []
 
     # Setup
     opt = Adam(lr=0.0001)
+    opt_discriminator = Adam(lr=0.00005)
     loss = "binary_crossentropy"
 
     # Setup adversary
     adversary = buildDiscriminator()
-    adversary.compile(loss=loss, optimizer=opt, metrics=["accuracy"])
+    adversary.compile(loss=loss, optimizer=opt_discriminator, metrics=["accuracy"])
 
     # Setup generator and GAN
     adversary.trainable = False  # freeze adversary's weights when training GAN
@@ -226,11 +228,11 @@ def buildGAN(images, epochs=40000, batchSize=32, loggingInterval=0):
             print("\t\tGenerator loss: %f." % genLoss)
             generator_losses.append(genLoss)
             discriminator_losses.append(advLoss[0])
+            x_vals.append(epoch)
             runGAN(generator, OUTPUT_DIR + "/" + OUTPUT_NAME + "_test_%d.png" % (epoch / loggingInterval))
 
-    plot_x_axis = range(len(generator_losses))
-    generator_line, = plt.plot(plot_x_axis, generator_losses, color='blue', label='Generator Loss')
-    discriminator_line, = plt.plot(plot_x_axis, discriminator_losses, color='red', label='Discriminator Loss')
+    generator_line, = plt.plot(x_vals, generator_losses, color='blue', label='Generator Loss')
+    discriminator_line, = plt.plot(x_vals, discriminator_losses, color='red', label='Discriminator Loss')
     plt.title('Losses for Generator and Discriminator')
     plt.xlabel('Log Number')
     plt.ylabel('Loss')
