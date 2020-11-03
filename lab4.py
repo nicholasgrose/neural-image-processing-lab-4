@@ -21,8 +21,8 @@ from PIL import Image
 import random
 import matplotlib.pyplot as plt
 
-physical_devices = tf.config.list_physical_devices('GPU') 
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
+# physical_devices = tf.config.list_physical_devices('GPU')
+# tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 random.seed(1618)
 np.random.seed(1618)
@@ -45,7 +45,7 @@ elif DATASET == "mnist_f":
     IMAGE_SHAPE = (IH, IW, IZ) = (28, 28, 1)
     CLASSLIST = ["top", "trouser", "pullover", "dress", "coat", "sandal", "shirt", "sneaker", "bag", "ankle boot"]
     # TODO: choose a label to train on from the CLASSLIST above
-    LABEL = "shirt"
+    LABEL = "dress"
 
 elif DATASET == "cifar_10":
     IMAGE_SHAPE = (IH, IW, IZ) = (32, 32, 3)
@@ -63,6 +63,8 @@ OUTPUT_DIR = "./outputs/" + OUTPUT_NAME
 # NOTE: switch to True in order to receive debug information
 VERBOSE_OUTPUT = False
 
+# EPOCHS = 768
+# GENERATOR_TRAINING_RATIO = 1.1
 EPOCHS = 1024
 GENERATOR_TRAINING_RATIO = 1
 GENERATOR_BATCH_SIZE = 128
